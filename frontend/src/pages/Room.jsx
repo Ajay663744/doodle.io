@@ -13,6 +13,7 @@ import GuessChat from '../components/GuessChat';
 import RoundResult from '../components/RoundResult';
 import GameEnd from '../components/GameEnd';
 import Leaderboard from '../components/Leaderboard';
+import AIHint from '../components/AIHint';
 
 const Room = () => {
     const { roomId } = useParams();
@@ -27,6 +28,9 @@ const Room = () => {
     const [selectedTool, setSelectedTool] = useState('pen');
     const [selectedColor, setSelectedColor] = useState('#000000');
     const [selectedSize, setSelectedSize] = useState(5);
+
+    // Track the word the drawer has chosen (for AI hint)
+    const [drawerWord, setDrawerWord] = useState('');
 
     // Game state from custom hook
     const {
@@ -94,7 +98,13 @@ const Room = () => {
     // Handle round continue
     const handleRoundContinue = () => {
         resetRoundState();
+        setDrawerWord('');
         setGamePhase('playing');
+    };
+
+    // Called by WordSelection when the drawer picks a word
+    const handleWordSelected = (word) => {
+        setDrawerWord(word);
     };
 
     // Handle game exit
@@ -232,12 +242,14 @@ const Room = () => {
                     {/* Playing Phase */}
                     {gamePhase === 'playing' && (
                         <>
+                            {/* AI Hint — top of sidebar, visible only to the drawer */}
+                            {isDrawer && <AIHint word={drawerWord} />}
+
                             {/* Leaderboard */}
                             <Leaderboard
                                 leaderboard={leaderboard}
                                 currentUserId={user?.id}
                             />
-
 
                             {/* Guess Chat */}
                             <GuessChat
@@ -271,6 +283,7 @@ const Room = () => {
                     roomId={roomId}
                     user={user}
                     wordOptions={wordOptions}
+                    onWordSelected={handleWordSelected}
                 />
             )}
 

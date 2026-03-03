@@ -5,9 +5,10 @@
 
 import { selectWord } from '../socket/gameSocketService';
 
-const WordSelection = ({ roomId, user, wordOptions }) => {
+const WordSelection = ({ roomId, user, wordOptions, onWordSelected }) => {
     const handleSelectWord = (word) => {
         selectWord(roomId, user.id, word);
+        if (onWordSelected) onWordSelected(word); // capture for AI hint
     };
 
     return (

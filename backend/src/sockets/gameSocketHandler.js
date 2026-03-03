@@ -10,6 +10,8 @@ const WordManager = require('../game/WordManager');
 const GameLifecycleManager = require('../game/GameLifecycleManager');
 const { initializeLobbyHandlers, getLobbyStatus, createRoundSummary } = require('./lobbySocketHandler');
 const GAME_CONFIG = require('../config/gameConfig');
+const GameHistory = require('../models/GameHistory');
+const User = require('../models/User');
 
 /**
  * Initialize game socket event handlers
@@ -575,6 +577,68 @@ function endGame(io, roomId) {
         // GameStateManager.deleteGame(roomId);
         console.log(`Game in room ${roomId} can be reset or deleted`);
     }, 60000); // 1 minute
+
+    // Persist game result to database (async, non-blocking)
+    persistGameResult(gameState, finalResults).catch(err =>
+        console.error('⚠️  Failed to persist game history:', err)
+    );
+}
+
+/**
+ * Persist completed game to MongoDB and update per-user stats.
+ * Called once at the end of each game session.
+ * @param {object} gameState - Final game state snapshot
+ * @param {object} finalResults - Results from GameLifecycleManager.getFinalResults
+ */
+async function persistGameResult(gameState, finalResults) {
+    try {
+        const players = gameState.players.map((p, idx) => ({
+            userId: p.userId,
+            username: p.username,
+            score: gameState.scores[p.userId] || 0,
+            rank: (finalResults.leaderboard || []).findIndex(l => l.userId === p.userId) + 1 || idx + 1
+        }));
+
+        const leaderboard = (finalResults.leaderboard || []).map((entry, idx) => ({
+            rank: idx + 1,
+            userId: entry.userId,
+            username: entry.username,
+            score: entry.score || 0
+        }));
+
+        // Save game history record
+        await GameHistory.create({
+            roomId: gameState.roomId,
+            roomName: gameState.roomName || gameState.roomId,
+            totalRounds: gameState.roundNumber || 0,
+            players,
+            winner: finalResults.winner
+                ? {
+                    userId: finalResults.winner.userId,
+                    username: finalResults.winner.username,
+                    score: finalResults.winner.score || 0
+                }
+                : null,
+            leaderboard
+        });
+
+        console.log(`💾 GameHistory saved for room: ${gameState.roomId}`);
+
+        // Update per-user lifetime stats
+        const updateOps = players.map(p =>
+            User.findByIdAndUpdate(
+                p.userId,
+                { $inc: { totalScore: p.score, gamesPlayed: 1 } },
+                { new: false }
+            )
+        );
+        await Promise.all(updateOps);
+
+        console.log(`📊 User stats updated for ${players.length} players in room: ${gameState.roomId}`);
+    } catch (err) {
+        console.error('Error persisting game result:', err);
+        throw err;
+    }
 }
 
 module.exports = initializeGameSocketHandlers;

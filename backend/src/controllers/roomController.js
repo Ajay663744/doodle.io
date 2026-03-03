@@ -248,10 +248,79 @@ const verifyRoomPassword = async (req, res) => {
     }
 };
 
+/**
+ * @desc    Join an existing room via REST (pre-socket authorization)
+ * @route   POST /api/rooms/join
+ * @access  Private
+ *
+ * Request Body:
+ * {
+ *   "roomId": "ABC123",
+ *   "password": "secret"  // optional, only for protected rooms
+ * }
+ *
+ * Response 200:
+ * {
+ *   "success": true,
+ *   "message": "Joined room successfully",
+ *   "data": { ...room }
+ * }
+ */
+const joinRoom = async (req, res) => {
+    try {
+        const { roomId, password } = req.body;
+
+        if (!roomId) {
+            return res.status(400).json({ success: false, message: 'Room ID is required' });
+        }
+
+        // Find room (include password for verification)
+        const room = await Room.findOne({ roomId: roomId.toUpperCase() }).select('+password');
+
+        if (!room) {
+            return res.status(404).json({ success: false, message: 'Room not found' });
+        }
+
+        // If password protected, verify it
+        if (room.isPasswordProtected) {
+            if (!password) {
+                return res.status(400).json({ success: false, message: 'Password required for this room' });
+            }
+            const isMatch = await bcrypt.compare(password, room.password);
+            if (!isMatch) {
+                return res.status(401).json({ success: false, message: 'Incorrect password' });
+            }
+        }
+
+        const userId = req.user.id;
+
+        // Add user to activeUsers if not already present
+        if (!room.activeUsers.map(id => id.toString()).includes(userId)) {
+            room.activeUsers.push(userId);
+            await room.save();
+        }
+
+        // Re-fetch without password for response
+        const updatedRoom = await Room.findOne({ roomId: room.roomId })
+            .populate('createdBy', 'name email')
+            .populate('activeUsers', 'name email');
+
+        res.status(200).json({
+            success: true,
+            message: 'Joined room successfully',
+            data: updatedRoom
+        });
+    } catch (error) {
+        console.error('JoinRoom error:', error);
+        res.status(500).json({ success: false, message: 'Server error joining room' });
+    }
+};
+
 module.exports = {
     createRoom,
     getRooms,
     getRoom,
     deleteRoom,
-    verifyRoomPassword
+    verifyRoomPassword,
+    joinRoom
 };

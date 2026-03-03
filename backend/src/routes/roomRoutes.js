@@ -1,6 +1,6 @@
 const express = require('express');
 const { body } = require('express-validator');
-const { createRoom, getRooms, getRoom, deleteRoom, verifyRoomPassword } = require('../controllers/roomController');
+const { createRoom, getRooms, getRoom, deleteRoom, verifyRoomPassword, joinRoom } = require('../controllers/roomController');
 const { protect } = require('../middleware/authMiddleware');
 
 const router = express.Router();
@@ -16,6 +16,7 @@ router.use(protect);
 
 // Routes
 router.post('/', createRoomValidation, createRoom);
+router.post('/join', joinRoom);                              // POST: join an existing room
 router.get('/', getRooms);
 router.get('/:roomId', getRoom);
 router.post('/:roomId/verify-password', verifyRoomPassword);

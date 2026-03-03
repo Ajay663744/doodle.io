@@ -50,3 +50,24 @@ export const verifyRoomPassword = async (roomId, password) => {
     const response = await api.post(`/rooms/${roomId}/verify-password`, { password });
     return response.data;
 };
+
+/**
+ * Join an existing room via REST (pre-socket authorization).
+ * Call this BEFORE emitting `join_game_room` over the socket.
+ * Verifies room existence + password, then adds user to activeUsers in DB.
+ *
+ * @param {string} roomId   - 6-character room code (e.g. "ABC123")
+ * @param {string} password - Room password (only required for protected rooms)
+ * @returns {Promise<{ success, message, data: room }>}
+ *
+ * Example:
+ *   const { data: room } = await joinRoom('ABC123');
+ *   socket.emit('join_game_room', { roomId: room.roomId, userId, username });
+ */
+export const joinRoom = async (roomId, password = null) => {
+    const payload = { roomId };
+    if (password) payload.password = password;
+    const response = await api.post('/rooms/join', payload);
+    return response.data; // { success, message, data: room }
+};
+

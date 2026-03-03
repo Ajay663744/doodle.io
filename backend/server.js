@@ -9,6 +9,11 @@ const initializeSocketHandlers = require('./src/sockets/socketHandler');
 // Import routes
 const authRoutes = require('./src/routes/authRoutes');
 const roomRoutes = require('./src/routes/roomRoutes');
+const userRoutes = require('./src/routes/userRoutes');
+const gameRoutes = require('./src/routes/gameRoutes');
+const aiRoutes = require('./src/routes/aiRoutes');
+const { protect } = require('./src/middleware/authMiddleware');
+const { getLeaderboard } = require('./src/controllers/gameController');
 
 // Initialize Express app
 const app = express();
@@ -45,6 +50,10 @@ if (process.env.NODE_ENV === 'development') {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/games', gameRoutes);
+app.use('/api/ai', aiRoutes);
+app.get('/api/leaderboard', protect, getLeaderboard); // convenience shortcut
 
 // Health check route
 app.get('/api/health', (req, res) => {
